@@ -25,6 +25,7 @@ public final class PlaybackService extends Service {
     private static final long FADE_MS = 5000;
     private boolean stopping;
     private boolean closing;
+    private boolean sessionStarted;
     private Bitmap artwork;
     private float duck = 1f;
     private final Runnable finishStop = this::releasePlayback;
@@ -62,6 +63,7 @@ public final class PlaybackService extends Service {
         public PlaybackService service() { return PlaybackService.this; }
     }
     public boolean isPlaying() { return playing && !stopping; }
+    public boolean needsSessionStart() { return !sessionStarted || closing; }
     public boolean isStopping() { return stopping; }
     public String getError() { return error; }
     public void setListener(Runnable listener) { this.listener = listener; }
@@ -118,6 +120,7 @@ public final class PlaybackService extends Service {
         // Foreground first: required before requesting focus on Android 15+.
         startForeground(NOTIFICATION, notification());
         session.setActive(true);
+        sessionStarted = true;
         if (intent != null && PLAY.equals(intent.getAction())) startPlayback();
         else if (intent != null && STOP.equals(intent.getAction())) stopPlayback();
         else updateNotification();
@@ -272,7 +275,7 @@ public final class PlaybackService extends Service {
         if (timer.isRunning()) handler.postDelayed(notificationTick, 60_000 - timer.elapsedMillis() % 60_000);
     }
     private Notification notification() {
-        PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent open = PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         String state = stopping ? "Fading out" : playing ? "Playing" : "Stopped";
         boolean showStop = playing && !stopping;
         return new Notification.Builder(this, CHANNEL).setSmallIcon(R.drawable.ic_noise)

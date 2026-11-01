@@ -1,6 +1,7 @@
 package lv.quietnoise;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.*;
 import android.graphics.Color;
 import android.graphics.Typeface;
@@ -15,6 +16,8 @@ public final class MainActivity extends Activity {
     private static final int MINT = Color.rgb(160, 178, 166);
     private PlaybackService service;
     private boolean bound;
+    private boolean visible;
+    private boolean crashReportShown;
     private Button toggle;
     private TextView status;
     private TextView volumeLabel;
@@ -25,7 +28,13 @@ public final class MainActivity extends Activity {
     private final Runnable timerTick = this::renderTimer;
     private final ServiceConnection connection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder binder) {
+            if (!visible) return;
             service = ((PlaybackService.LocalBinder) binder).service();
+            // Reopening the UI should not restart or re-promote an already
+            // running service, particularly on older vendor Android versions.
+            if (service.needsSessionStart()) {
+                startForegroundService(new Intent(MainActivity.this, PlaybackService.class).setAction(PlaybackService.SHOW));
+            }
             service.setListener(MainActivity.this::render);
             volume.setProgress(service.getVolume());
             render();
@@ -145,17 +154,35 @@ public final class MainActivity extends Activity {
         timerValue.setText(PlaybackTimer.format(elapsed));
         resetTimer.setEnabled(service != null);
         // Refresh only when a displayed minute changes, and only while visible.
-        if (service != null && service.isTimerRunning()) {
+        if (visible && service != null && service.isTimerRunning()) {
             timerHandler.postDelayed(timerTick, 60_000 - elapsed % 60_000);
         }
     }
+    @Override protected void onPostResume() {
+        super.onPostResume();
+        if (crashReportShown) return;
+        SharedPreferences diagnostics = getSharedPreferences("diagnostics", MODE_PRIVATE);
+        String report = diagnostics.getString("lastCrash", null);
+        if (report == null) return;
+        crashReportShown = true;
+        diagnostics.edit().remove("lastCrash").apply();
+        new AlertDialog.Builder(this)
+                .setTitle("Previous app error")
+                .setMessage("An error was saved on this phone. Copy these details to help diagnose it.\n\n" + report)
+                .setPositiveButton("Copy details", (dialog, which) -> {
+                    android.content.ClipboardManager clipboard = getSystemService(android.content.ClipboardManager.class);
+                    clipboard.setPrimaryClip(ClipData.newPlainText("Quiet Noise error", report));
+                })
+                .setNegativeButton("Close", null).show();
+    }
     @Override protected void onStart() {
         super.onStart();
+        visible = true;
         render();
-        startForegroundService(new Intent(this, PlaybackService.class).setAction(PlaybackService.SHOW));
         bound = bindService(new Intent(this, PlaybackService.class), connection, BIND_AUTO_CREATE);
     }
     @Override protected void onStop() {
+        visible = false;
         timerHandler.removeCallbacks(timerTick);
         if (service != null) service.setListener(null);
         if (bound) { unbindService(connection); bound = false; }
