@@ -29,7 +29,17 @@ public final class PlaybackService extends Service {
     private boolean sessionStarted;
     private Bitmap artwork;
     private float duck = 1f;
-    private final Runnable finishStop = this::releasePlayback;
+    private long stopFadeDeadline;
+    private final Runnable finishStop = this::finishStopWhenSilent;
+    private void finishStopWhenSilent() {
+        if (!stopping) return;
+        // Some device mixers deliver the final fade frames after the nominal
+        // duration. Avoid cutting them off at a nonzero gain.
+        if (fade != null && fade.getVolume() > 0.00001f
+                && SystemClock.elapsedRealtime() < stopFadeDeadline) {
+            handler.postDelayed(finishStop, 16);
+        } else releasePlayback();
+    }
     private final Runnable notificationTick = this::updateNotification;
     private MediaSession session;
     private AudioManager audio;
@@ -165,7 +175,9 @@ public final class PlaybackService extends Service {
                             .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
                     .setTransferMode(AudioTrack.MODE_STATIC)
                     .setBufferSizeInBytes(pcm.length)
-                    .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_POWER_SAVING)
+                    // Do not explicitly request the deep-buffer power-saving path:
+                    // some older device mixers expose coarse envelope updates.
+                    .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_NONE)
                     .build();
             if (player.write(pcm, 0, pcm.length) != pcm.length
                     || player.setLoopPoints(0, pcm.length / 2, -1) != AudioTrack.SUCCESS) {
@@ -233,6 +245,7 @@ public final class PlaybackService extends Service {
         // Join at the current level so even a stop during fade-in takes five
         // seconds to reach silence, without a volume jump or a Java update loop.
         fade.replace(fadeConfiguration(false), VolumeShaper.Operation.PLAY, true);
+        stopFadeDeadline = SystemClock.elapsedRealtime() + FADE_MS + 1000;
         handler.postDelayed(finishStop, FADE_MS);
         updateNotification();
         notifyUi();
