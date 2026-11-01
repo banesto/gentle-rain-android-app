@@ -2,6 +2,10 @@
 
 A simple Android app that plays calming rain to help babies settle down and fall asleep. The sound is included in the app, so no internet connection is needed. Turn on flight mode for an uninterrupted bedtime, then start the rain and lock the screen.
 
+<p align="center">
+  <img src="docs/images/screenshot.png" alt="Quiet Noise playing gentle rain, with a dark interface, large Stop button, playback timer, and volume slider" width="320">
+</p>
+
 The dark interface keeps things comfortable in a dim room, with just the controls you need:
 
 - **Play / Stop:** rain loops continuously until stopped. Pressing Play gradually fades the sound in over five seconds to avoid a sudden loud blast. Pressing Stop gently fades it out over five seconds instead of ending abruptly.
