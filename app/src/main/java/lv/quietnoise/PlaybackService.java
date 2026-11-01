@@ -21,6 +21,7 @@ public final class PlaybackService extends Service {
     private final LocalBinder binder = new LocalBinder();
     private AudioTrack player;
     private VolumeShaper fade;
+    private PcmStreamLoop pcmLoop;
     private PowerManager.WakeLock wakeLock;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private static final long FADE_MS = 5000;
@@ -35,8 +36,9 @@ public final class PlaybackService extends Service {
         if (!stopping) return;
         // Some device mixers deliver the final fade frames after the nominal
         // duration. Avoid cutting them off at a nonzero gain.
-        if (fade != null && fade.getVolume() > 0.00001f
-                && SystemClock.elapsedRealtime() < stopFadeDeadline) {
+        boolean silent = pcmLoop != null ? pcmLoop.reachedSilence()
+                : fade == null || fade.getVolume() <= 0.00001f;
+        if (!silent && SystemClock.elapsedRealtime() < stopFadeDeadline) {
             handler.postDelayed(finishStop, 16);
         } else releasePlayback();
     }
@@ -153,7 +155,8 @@ public final class PlaybackService extends Service {
                 stopping = false;
                 timer.start();
                 saveTimer();
-                fade.replace(fadeConfiguration(true), VolumeShaper.Operation.PLAY, true);
+                if (pcmLoop != null) pcmLoop.fadeTo(true, FADE_MS);
+                else fade.replace(fadeConfiguration(true), VolumeShaper.Operation.PLAY, true);
                 updateNotification();
                 notifyUi();
             }
@@ -168,27 +171,44 @@ public final class PlaybackService extends Service {
         hasFocus = true;
         try {
             byte[] pcm = loadPcm();
+            boolean sampleFade = usesSampleFades();
+            int minBuffer = AudioTrack.getMinBufferSize(44100, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+            if (sampleFade && minBuffer <= 0) throw new IOException("Unsupported audio output");
             player = new AudioTrack.Builder()
                     .setAudioAttributes(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
                             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
                     .setAudioFormat(new AudioFormat.Builder().setSampleRate(44100)
                             .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).setEncoding(AudioFormat.ENCODING_PCM_16BIT).build())
-                    .setTransferMode(AudioTrack.MODE_STATIC)
-                    .setBufferSizeInBytes(pcm.length)
+                    .setTransferMode(sampleFade ? AudioTrack.MODE_STREAM : AudioTrack.MODE_STATIC)
+                    .setBufferSizeInBytes(sampleFade ? Math.max(minBuffer * 2, 4410 * 2) : pcm.length)
                     // Do not explicitly request the deep-buffer power-saving path:
                     // some older device mixers expose coarse envelope updates.
                     .setPerformanceMode(AudioTrack.PERFORMANCE_MODE_NONE)
                     .build();
-            if (player.write(pcm, 0, pcm.length) != pcm.length
-                    || player.setLoopPoints(0, pcm.length / 2, -1) != AudioTrack.SUCCESS) {
+            if (!sampleFade && (player.write(pcm, 0, pcm.length) != pcm.length
+                    || player.setLoopPoints(0, pcm.length / 2, -1) != AudioTrack.SUCCESS)) {
                 throw new IOException("Could not load continuous loop");
             }
             duck = 1f;
-            applyVolume();
-            fade = player.createVolumeShaper(fadeConfiguration(true));
-            fade.apply(VolumeShaper.Operation.PLAY);
-            wakeLock.acquire();
-            player.play();
+            if (sampleFade) {
+                PcmStreamLoop loop = new PcmStreamLoop(player, pcm, failed -> handler.post(() -> {
+                    if (playing && pcmLoop == failed) {
+                        error = "Playback stopped. Tap Play to try again.";
+                        releasePlayback();
+                    }
+                }));
+                pcmLoop = loop;
+                applyVolume();
+                loop.fadeTo(true, FADE_MS);
+                wakeLock.acquire();
+                loop.start();
+            } else {
+                applyVolume();
+                fade = player.createVolumeShaper(fadeConfiguration(true));
+                fade.apply(VolumeShaper.Operation.PLAY);
+                wakeLock.acquire();
+                player.play();
+            }
             timer.start();
             saveTimer();
             playing = true;
@@ -218,6 +238,12 @@ public final class PlaybackService extends Service {
             return pcm;
         }
     }
+    private boolean usesSampleFades() {
+        String maker = Build.MANUFACTURER.toLowerCase(java.util.Locale.ROOT);
+        // Exercise this path on Android's standard test emulator as well.
+        return maker.contains("xiaomi") || maker.contains("redmi") || maker.contains("poco")
+                || Build.PRODUCT.startsWith("sdk_gphone");
+    }
     public void setVolume(int value) {
         getSharedPreferences("settings", MODE_PRIVATE).edit().putInt("volume", value).apply();
         applyVolume();
@@ -226,7 +252,8 @@ public final class PlaybackService extends Service {
     private void applyVolume() {
         if (player != null) {
             float level = getVolume() / 100f * duck;
-            player.setVolume(level);
+            if (pcmLoop != null) pcmLoop.setVolume(level);
+            else player.setVolume(level);
         }
     }
     private VolumeShaper.Configuration fadeConfiguration(boolean fadeIn) {
@@ -244,7 +271,8 @@ public final class PlaybackService extends Service {
         freezeTimer();
         // Join at the current level so even a stop during fade-in takes five
         // seconds to reach silence, without a volume jump or a Java update loop.
-        fade.replace(fadeConfiguration(false), VolumeShaper.Operation.PLAY, true);
+        if (pcmLoop != null) pcmLoop.fadeTo(false, FADE_MS);
+        else fade.replace(fadeConfiguration(false), VolumeShaper.Operation.PLAY, true);
         stopFadeDeadline = SystemClock.elapsedRealtime() + FADE_MS + 1000;
         handler.postDelayed(finishStop, FADE_MS);
         updateNotification();
@@ -256,9 +284,15 @@ public final class PlaybackService extends Service {
         freezeTimer();
         stopping = false;
         playing = false;
-        if (player != null) player.setVolume(0f);
-        if (fade != null) { fade.close(); fade = null; }
-        if (player != null) { player.release(); player = null; }
+        if (pcmLoop != null) {
+            pcmLoop.close();
+            pcmLoop = null;
+            player = null; // The writer releases its own AudioTrack after exiting.
+        } else {
+            if (player != null) player.setVolume(0f);
+            if (fade != null) { fade.close(); fade = null; }
+            if (player != null) { player.release(); player = null; }
+        }
         if (wakeLock != null && wakeLock.isHeld()) wakeLock.release();
         if (hasFocus) { audio.abandonAudioFocusRequest(focus); hasFocus = false; }
         if (closing) {
