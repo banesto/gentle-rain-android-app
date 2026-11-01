@@ -1,6 +1,7 @@
 package lv.quietnoise;
 
 import android.app.*;
+import android.annotation.SuppressLint;
 import android.content.*;
 import android.media.*;
 import android.graphics.Bitmap;
@@ -118,13 +119,20 @@ public final class PlaybackService extends Service {
         if (closing && intent != null && (SHOW.equals(intent.getAction()) || PLAY.equals(intent.getAction()))) closing = false;
         if (closing) return START_NOT_STICKY;
         // Foreground first: required before requesting focus on Android 15+.
-        startForeground(NOTIFICATION, notification());
-        session.setActive(true);
-        sessionStarted = true;
+        if (!sessionStarted) {
+            startForeground(NOTIFICATION, notification());
+            session.setActive(true);
+            sessionStarted = true;
+        }
         if (intent != null && PLAY.equals(intent.getAction())) startPlayback();
         else if (intent != null && STOP.equals(intent.getAction())) stopPlayback();
         else updateNotification();
         return START_NOT_STICKY;
+    }
+    public void playFromScreen() {
+        if (!sessionStarted) {
+            startForegroundService(new Intent(this, PlaybackService.class).setAction(PLAY));
+        } else startPlayback();
     }
     private void startPlayback() {
         if (playing) {
@@ -172,7 +180,6 @@ public final class PlaybackService extends Service {
             timer.start();
             saveTimer();
             playing = true;
-            session.setActive(true);
             updateNotification();
             notifyUi();
         } catch (Exception exception) {
@@ -256,6 +263,8 @@ public final class PlaybackService extends Service {
         return PendingIntent.getService(this, id, new Intent(this, PlaybackService.class).setAction(action),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
+    // Media-session notifications are exempt from POST_NOTIFICATIONS permission.
+    @SuppressLint("NotificationPermission")
     private void updateNotification() {
         handler.removeCallbacks(notificationTick);
         if (closing) return;
@@ -266,11 +275,22 @@ public final class PlaybackService extends Service {
                 .putString(MediaMetadata.METADATA_KEY_ARTIST, elapsed)
                 .putString(MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE, elapsed)
                 .putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, artwork).build());
-        // Android 13+ otherwise replaces a playing session's primary control
-        // with Pause. With no PlaybackState, System UI uses our notification's
-        // single explicit Play/Stop action (also used by older Android versions).
-        session.setPlaybackState(null);
-        startForeground(NOTIFICATION, notification());
+        if (Build.VERSION.SDK_INT < 33) {
+            // Older Android/MIUI expects a complete state. Its media notification
+            // controls come from our action list, so this still shows Play/Stop.
+            session.setPlaybackState(new PlaybackState.Builder()
+                    .setActions(PlaybackState.ACTION_PLAY | PlaybackState.ACTION_STOP)
+                    .setState(playing && !stopping ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_STOPPED,
+                            PlaybackState.PLAYBACK_POSITION_UNKNOWN, playing && !stopping ? 1f : 0f).build());
+        } else {
+            // Android 13+ otherwise substitutes Pause for the requested Stop.
+            session.setPlaybackState(null);
+        }
+        if (sessionStarted) {
+            // Update the existing card without re-promoting the service every
+            // time the main button is pressed or a displayed minute changes.
+            getSystemService(NotificationManager.class).notify(NOTIFICATION, notification());
+        }
         // One update per displayed minute while audio is active; no second ticks.
         if (timer.isRunning()) handler.postDelayed(notificationTick, 60_000 - timer.elapsedMillis() % 60_000);
     }

@@ -85,7 +85,7 @@ public final class MainActivity extends Activity {
         toggle.setOnClickListener(view -> {
             if (service == null) return;
             if (service.isPlaying()) service.stopPlayback();
-            else startForegroundService(new Intent(this, PlaybackService.class).setAction(PlaybackService.PLAY));
+            else service.playFromScreen();
         });
         TextView timerLabel = text("Playback time", 15, Color.rgb(154, 177, 166));
         LinearLayout.LayoutParams timerLabelParams = new LinearLayout.LayoutParams(-1, -2);
