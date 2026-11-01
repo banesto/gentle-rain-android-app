@@ -18,7 +18,7 @@ This is the compressed preview, not the original 24-bit WAV download, which requ
 Freesound login. No account or network access is needed by the Android app.
 
 App adaptations: decode to 44.1 kHz mono 16-bit PCM, select 60 seconds from 0.5s,
-blend a six-second equal-power overlap to produce a 54-second loop, and double amplitude (+6.02 dB), limited only if necessary to preserve headroom. No synthetic droplets, thunder, music,
+blend a six-second equal-power overlap to produce a 54-second loop, and normalize average loudness with a smooth offline look-ahead limiter (peak ceiling -1 dBFS). No synthetic droplets, thunder, music,
 or other effects were added. Native start/stop fades remain separate from the loop.
 
 The description suggests gentle garden rain, but the full recording has not been

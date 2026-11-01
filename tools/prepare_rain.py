@@ -25,9 +25,32 @@ for i in range(overlap):
     weight = 0.5 - 0.5 * math.cos(math.pi * i / (overlap - 1))
     mixed[i] = samples[length + i] * math.sqrt(1-weight) + samples[i] * math.sqrt(weight)
 del mixed[length:]
-# Double amplitude (+6.02 dB), preserving dynamics with headroom against clipping.
-gain = min(2.0, 0.55 * 32767 / max(abs(x) for x in mixed))
-output = array.array('h', (round(x * gain) for x in mixed))
+# Normalize the quiet field recording to a useful average level. A smooth,
+# offline look-ahead limiter controls occasional loud drops without clipping.
+# Nothing is generated or processed continuously on the phone.
+target_rms = 32767 * 10 ** (-23 / 20)
+ceiling = 32767 * 10 ** (-1 / 20)
+rms = math.sqrt(sum(x*x for x in mixed) / len(mixed))
+assert rms > 0
+gain = target_rms / rms
+# Three repeats allow attack/release envelopes to settle across the loop join.
+# Use the middle repeat so the limiter itself does not create a loop seam.
+levels = array.array('f', [1.0]) * (length * 3)
+release = 1 - math.exp(-1 / (rate * 0.12))
+level = 1.0
+for i in range(len(levels)):
+    amplitude = abs(mixed[i % length] * gain)
+    required = min(1.0, ceiling / amplitude) if amplitude else 1.0
+    level = min(required, level + (1-level) * release)
+    levels[i] = level
+attack = 1 - math.exp(-1 / (rate * 0.005))
+level = 1.0
+for i in range(len(levels)-1, -1, -1):
+    level = min(levels[i], level + (1-level) * attack)
+    levels[i] = level
+output = array.array('h', (round(x * gain * levels[length+i]) for i, x in enumerate(mixed)))
+assert max(abs(x) for x in output) <= math.ceil(ceiling)
+print(f"RMS normalization gain: {20*math.log10(gain):.1f} dB; peak ceiling: -1 dBFS")
 if sys.byteorder != 'little':
     output.byteswap()
 path = Path(__file__).resolve().parents[1] / 'app/src/main/res/raw/gentle_rain.wav'
