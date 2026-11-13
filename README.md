@@ -1,6 +1,6 @@
 # Quiet Noise — Gentle rain
 
-A simple Android app that plays calming rain to help babies settle down and fall asleep. The sound is included in the app, so no internet connection is needed. Turn on flight mode for an uninterrupted bedtime, then start the rain and lock the screen.
+A simple Android app that plays a smooth, rain-like noise to help babies settle down and fall asleep. The sound is included in the app, so no internet connection is needed. Turn on flight mode for an uninterrupted bedtime, then start the rain and lock the screen.
 
 <p align="center">
   <img src="docs/images/screenshot.png" alt="Quiet Noise playing gentle rain, with a dark interface, large Stop button, playback timer, and volume slider" width="320">
@@ -15,6 +15,6 @@ The dark interface keeps things comfortable in a dim room, with just the control
 
 Rain continues with the screen locked or the app in the background. A dark media card keeps Play/Stop and the timer accessible from notifications. To close the app completely, swipe it away from Recent apps.
 
-## Audio credit
+## Sound
 
-Rain recording: [“Soft rain.WAV” by barkenov on Freesound](https://freesound.org/people/barkenov/sounds/640655/), released under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/). Adapted for continuous looping in the app.
+The sound is generated offline from softened white noise, with a steady level and no individual droplets or background events. It is bundled with the app; no audio is generated live and no internet connection is needed.

@@ -13,13 +13,13 @@ with wave.open(str(root / 'app/src/main/res/raw/gentle_rain.wav'), 'rb') as file
     samples = array.array('h', file.readframes(file.getnframes()))
 if sys.byteorder != 'little':
     samples.byteswap()
-assert len(samples) == rate * 54
+assert len(samples) == rate * 120
 assert max(abs(value) for value in samples) < 32767
 step_rms = math.sqrt(sum((samples[i] - samples[i-1])**2 for i in range(1, len(samples))) / (len(samples)-1))
 assert abs(samples[0] - samples[-1]) < 4 * step_rms, 'Loop boundary click risk'
 levels = [math.sqrt(sum(value*value for value in samples[i:i+rate]) / rate) for i in range(0, len(samples), rate)]
 assert min(levels) > 0
-assert max(levels) / min(levels) < 3.0, 'Unexpected level dip or surge'
+assert max(levels) / min(levels) < 1.12, 'Unexpected level dip or surge'
 
 # Twelve seconds before the join, twelve seconds after; no fades in the file.
 preview = samples[-rate*12:] + samples[:rate*12]

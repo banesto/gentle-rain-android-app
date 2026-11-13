@@ -2,8 +2,8 @@
 """Prepare the licensed field recording for offline static-buffer playback.
 
 First decode on macOS:
-afconvert -f WAVE -d LEI16@44100 -c 1 audio-source/soft-rain-barkenov.mp3 /tmp/quiet-rain-decoded.wav
-Then run: python3 tools/prepare_rain.py /tmp/quiet-rain-decoded.wav
+afconvert -f WAVE -d LEI16@44100 -c 1 audio-source/candidates/light-rain-sheyvan.mp3 /tmp/quiet-rain-sheyvan-decoded.wav
+Then run: python3 tools/prepare_rain.py /tmp/quiet-rain-sheyvan-decoded.wav
 """
 import array
 import math
@@ -14,12 +14,12 @@ import wave
 rate = 44100
 with wave.open(sys.argv[1], 'rb') as file:
     assert (file.getnchannels(), file.getsampwidth(), file.getframerate()) == (1, 2, rate)
-    file.setpos(rate // 2)
-    samples = array.array('h', file.readframes(60 * rate))
+    file.setpos(180 * rate)  # Use exactly 3:00–5:00 of the selected recording.
+    samples = array.array('h', file.readframes(120 * rate))
 if sys.byteorder != 'little':
     samples.byteswap()
-assert len(samples) == 60 * rate
-length, overlap = 54 * rate, 6 * rate
+assert len(samples) == 120 * rate
+length, overlap = 114 * rate, 6 * rate
 mixed = array.array('f', samples)
 for i in range(overlap):
     weight = 0.5 - 0.5 * math.cos(math.pi * i / (overlap - 1))
@@ -28,8 +28,8 @@ del mixed[length:]
 # Normalize the quiet field recording to a useful average level. A smooth,
 # offline look-ahead limiter controls occasional loud drops without clipping.
 # Nothing is generated or processed continuously on the phone.
-target_rms = 32767 * 10 ** (-23 / 20)
-ceiling = 32767 * 10 ** (-1 / 20)
+target_rms = 32767 * 10 ** (-26 / 20)
+ceiling = 32767 * 10 ** (-3 / 20)
 rms = math.sqrt(sum(x*x for x in mixed) / len(mixed))
 assert rms > 0
 gain = target_rms / rms
@@ -50,7 +50,7 @@ for i in range(len(levels)-1, -1, -1):
     levels[i] = level
 output = array.array('h', (round(x * gain * levels[length+i]) for i, x in enumerate(mixed)))
 assert max(abs(x) for x in output) <= math.ceil(ceiling)
-print(f"RMS normalization gain: {20*math.log10(gain):.1f} dB; peak ceiling: -1 dBFS")
+print(f"RMS normalization gain: {20*math.log10(gain):.1f} dB; peak ceiling: -3 dBFS")
 if sys.byteorder != 'little':
     output.byteswap()
 path = Path(__file__).resolve().parents[1] / 'app/src/main/res/raw/gentle_rain.wav'
