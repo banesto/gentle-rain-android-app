@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare soundrecorder7's CC0 Light Rain HQ preview: seamless loop, 3x amplitude.
+"""Prepare soundrecorder7's CC0 Light Rain HQ preview: seamless loop, 9x amplitude.
 Decode to mono PCM16/44100 first; pass the decoded WAV as the only argument.
 """
 import array
@@ -21,7 +21,7 @@ mixed = array.array('d', samples[:length])
 for i in range(overlap):
     angle = math.pi / 2 * i / (overlap - 1)
     mixed[i] = samples[length+i]*math.cos(angle) + samples[i]*math.sin(angle)
-output = array.array('h', (round(x*3) for x in mixed))
+output = array.array('h', (round(x*9) for x in mixed))
 assert max(abs(x) for x in output) < 32767
 if sys.byteorder != 'little':
     output.byteswap()
@@ -29,4 +29,4 @@ path = Path(__file__).resolve().parents[1]/'app/src/main/res/raw/gentle_rain.wav
 with wave.open(str(path), 'wb') as w:
     w.setparams((1, 2, rate, 0, 'NONE', 'not compressed'))
     w.writeframes(output.tobytes())
-print(f'{path}: {length/rate:.3f}s; amplitude x3 (+9.54 dB); no clipping or baked start/stop fades')
+print(f'{path}: {length/rate:.3f}s; amplitude x9 (+19.08 dB); no clipping or baked start/stop fades')
