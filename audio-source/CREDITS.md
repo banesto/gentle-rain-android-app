@@ -8,7 +8,7 @@ Retrieved 2026-11-14 from the public high-quality MP3 preview:
 https://cdn.freesound.org/previews/167/167034_2328971-hq.mp3
 
 Decoded to mono 44.1 kHz PCM16, with a two-second constant-power loop overlap
-and exactly 2x sample amplitude (+6.02 dB), without clipping or limiting.
+and exactly 3x sample amplitude (+9.54 dB), without clipping or limiting.
 No start/end fades are baked in; the app retains its five-second Play/Stop fades.
 Reproduce with tools/prepare_selected_rain.py after decoding the source.
 The downloaded source is stored in ignored audio-source/candidates/.
