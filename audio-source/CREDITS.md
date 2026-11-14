@@ -1,23 +1,17 @@
 # Audio provenance
 
-## Active app sound
+The active app sound is “Light Rain” by soundrecorder7:
+https://freesound.org/people/soundrecorder7/sounds/167034/
+License: CC0 1.0 https://creativecommons.org/publicdomain/zero/1.0/
 
-The bundled gentle_rain.wav is synthesized offline by tools/generate_rain_noise.py.
-It uses deterministic white noise with fixed filtering to soften high frequencies
-and remove low rumble. It contains no third-party recording, added droplets,
-periodic modulation, environmental events, or baked-in start/end fades.
+Retrieved 2026-11-14 from the public high-quality MP3 preview:
+https://cdn.freesound.org/previews/167/167034_2328971-hq.mp3
 
-The 120-second mono 44.1 kHz PCM file has stationary level at -26 dBFS RMS. Filter
-state is warmed with the loop tail to make the waveform cyclic without a crossfade
-or a recurring level dip. The app applies its existing five-second Play/Stop fades.
+Decoded to mono 44.1 kHz PCM16, with a two-second constant-power loop overlap
+and exactly 2x sample amplitude (+6.02 dB), without clipping or limiting.
+No start/end fades are baked in; the app retains its five-second Play/Stop fades.
+Reproduce with tools/prepare_selected_rain.py after decoding the source.
+The downloaded source is stored in ignored audio-source/candidates/.
 
-## Earlier comparison candidate (not bundled)
-
-The local candidates/light-rain-sheyvan.mp3 is the high-quality MP3 preview of
-“Ambience: Light Rain” by Sheyvan (Philipp Grzemba), released under CC0:
-https://freesound.org/people/Sheyvan/sounds/523653/
-https://creativecommons.org/publicdomain/zero/1.0/
-
-It was retrieved on 2026-11-13 to compare its 3:00–5:00 excerpt. The local candidate
-is excluded from Git. tools/prepare_rain.py is retained to reproduce that earlier
-recording-based comparison; the active synthetic sound uses generate_rain_noise.py.
+Earlier synthetic generators and comparison previews are retained for reference;
+they do not generate the active app audio.
