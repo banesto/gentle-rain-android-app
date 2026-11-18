@@ -17,7 +17,7 @@ assert 20 * rate <= len(samples) <= 130 * rate
 assert max(abs(value) for value in samples) < 32767
 step_rms = math.sqrt(sum((samples[i] - samples[i-1])**2 for i in range(1, len(samples))) / (len(samples)-1))
 assert abs(samples[0] - samples[-1]) < 4 * step_rms, 'Loop boundary click risk'
-levels = [math.sqrt(sum(value*value for value in samples[i:i+rate]) / rate) for i in range(0, len(samples), rate)]
+levels = [math.sqrt(sum(value*value for value in samples[i:i+rate]) / len(samples[i:i+rate])) for i in range(0, len(samples), rate)]
 assert min(levels) > 0
 print(f'Natural recording 1-second RMS range: {max(levels)/min(levels):.2f}x')
 

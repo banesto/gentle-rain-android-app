@@ -17,4 +17,4 @@ Rain continues with the screen locked or the app in the background. A dark media
 
 ## Sound
 
-The app uses [Light Rain by soundrecorder7](https://freesound.org/people/soundrecorder7/sounds/167034/), shared under [CC0](https://creativecommons.org/publicdomain/zero/1.0/). The recording is bundled with the app and loops continuously without needing an internet connection.
+The rain recording is bundled with the app and loops continuously without needing an internet connection.
