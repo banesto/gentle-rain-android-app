@@ -14,13 +14,12 @@ with wave.open(sys.argv[1], 'rb') as w:
 if sys.byteorder != 'little':
     samples.byteswap()
 rate = 44100
-overlap = 2 * rate
-length = len(samples) - overlap
-mixed = array.array('d', samples[:length])
-# Constant-power overlap preserves rain energy, rather than fading into silence.
-for i in range(overlap):
-    angle = math.pi / 2 * i / (overlap - 1)
-    mixed[i] = samples[length+i]*math.cos(angle) + samples[i]*math.sin(angle)
+# Repeated waveform detected at a lag of 3,515,776 frames (79.722812s).
+# Start away from the video boundary and retain exactly one full cycle.
+start = 5 * rate
+length = 3515776
+assert len(samples) >= start + length, 'Source is too short for the detected loop'
+mixed = array.array('d', samples[start:start+length])
 # Keep this quiet capture close to the previous app level, with peak headroom.
 rms = math.sqrt(sum(x*x for x in mixed) / len(mixed))
 peak = max(abs(x) for x in mixed)
