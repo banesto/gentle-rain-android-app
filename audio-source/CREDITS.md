@@ -1,13 +1,11 @@
 # Audio provenance
 
-The active app sound is prepared from the user-supplied
-Easy-spring-rain-ambience.mp3 in the project root.
-Author, original source URL, and license have not yet been provided.
+The active app sound was extracted from the user-supplied video
+2026-11-21 15-29-00.mp4 (in the user's Movies folder).
+Author, original source URL, and license are unknown.
 
-Decoded to mono 44.1 kHz PCM16 at the original amplitude, with a two-second
-constant-power overlap for continuous looping. No clipping or limiting.
+Extracted with macOS afconvert as mono 44.1 kHz PCM16. Prepared with
+tools/prepare_selected_rain.py: two-second constant-power overlap for looping,
+level raised toward -27 dBFS RMS, capped at -1 dBFS peak without limiting.
 No start/end fades are baked in; the app retains its five-second Play/Stop fades.
-Reproduce with tools/prepare_selected_rain.py after decoding the source.
-
-Previous sound (no longer bundled): “Light Rain” by soundrecorder7, CC0:
-https://freesound.org/people/soundrecorder7/sounds/167034/
+The source video is not copied into the repository.

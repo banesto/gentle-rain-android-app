@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare the supplied Easy Spring Rain recording as a seamless loop.
+"""Prepare the audio extracted from the supplied video as a seamless loop.
 Decode to mono PCM16/44100 first; pass the decoded WAV as the only argument.
 """
 import array
@@ -21,7 +21,11 @@ mixed = array.array('d', samples[:length])
 for i in range(overlap):
     angle = math.pi / 2 * i / (overlap - 1)
     mixed[i] = samples[length+i]*math.cos(angle) + samples[i]*math.sin(angle)
-output = array.array('h', (round(x) for x in mixed))
+# Keep this quiet capture close to the previous app level, with peak headroom.
+rms = math.sqrt(sum(x*x for x in mixed) / len(mixed))
+peak = max(abs(x) for x in mixed)
+gain = min(32767 * 10**(-27/20) / rms, 32767 * 10**(-1/20) / peak)
+output = array.array('h', (round(x*gain) for x in mixed))
 assert max(abs(x) for x in output) < 32767
 if sys.byteorder != 'little':
     output.byteswap()
@@ -29,4 +33,4 @@ path = Path(__file__).resolve().parents[1]/'app/src/main/res/raw/gentle_rain.wav
 with wave.open(str(path), 'wb') as w:
     w.setparams((1, 2, rate, 0, 'NONE', 'not compressed'))
     w.writeframes(output.tobytes())
-print(f'{path}: {length/rate:.3f}s; original amplitude (no gain boost); no clipping or baked start/stop fades')
+print(f'{path}: {length/rate:.3f}s; gain {20*math.log10(gain):.2f} dB; no clipping or baked start/stop fades')
